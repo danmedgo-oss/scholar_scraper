@@ -1,69 +1,79 @@
+import os
 import json
-import sys
-from scholarly import scholarly, ProxyGenerator
+from datetime import datetime
+from serpapi import GoogleSearch
 
-def main():
-    print("กำลังค้นหา Free Proxy... (ขั้นตอนนี้อาจใช้เวลา 2-5 นาที)")
+AUTHOR_ID = "8UGgxCIAAAAJ"
+OUTPUT_FILE = "scholar_data.json"
+
+def fetch_author_rag_data(author_id):
+    # ดึง API Key จาก GitHub Secrets
+    api_key = os.getenv("SERPAPI_KEY")
+    if not api_key:
+        print("🚨 Error: ไม่พบ SERPAPI_KEY ใน Environment Variables")
+        return None
+
+    print(f"🚀 กำลังดึงข้อมูล Scholar ID: {author_id} ผ่าน SerpApi...")
     
-    # สร้างตัวจัดการ Proxy
-    pg = ProxyGenerator()
-    
-    # ค้นหาและตั้งค่า Free Proxy
-    # ข้อควรระวัง: บางครั้งอาจหา Proxy ฟรีที่ไม่โดนแบนไม่ได้เลย
-    success = pg.FreeProxies() 
-    
-    if success:
-        print("✅ ตั้งค่า Proxy สำเร็จ! ระบบกำลังเริ่มดึงข้อมูล...")
-        scholarly.use_proxy(pg)
-    else:
-        print("⚠️ ไม่พบ Free Proxy ที่ใช้งานได้ในขณะนี้ สคริปต์จะลองดึงข้อมูลโดยไม่ใช้ Proxy (มีความเสี่ยงที่จะโดนบล็อกสูง)")
+    # กำหนดพารามิเตอร์สำหรับ SerpApi
+    params = {
+        "engine": "google_scholar_author",
+        "author_id": author_id,
+        "api_key": api_key
+    }
 
     try:
-        author_name = 'Roongtiva Boonpracom'
-        print(f"กำลังค้นหาโปรไฟล์ของ: {author_name}...")
-        
-        # ค้นหาชื่ออาจารย์
-        search_query = scholarly.search_author(author_name)
-        author = next(search_query)
-        
-        print("พบบัญชีผู้ใช้แล้ว! กำลังดึงรายละเอียดเชิงลึกและผลงานตีพิมพ์ทั้งหมด...")
-        # ดึงข้อมูลทั้งหมดของโปรไฟล์ (ขั้นตอนนี้อาจใช้เวลานานขึ้นอยู่กับจำนวนเปเปอร์)
-        author = scholarly.fill(author)
-        
-        # จัดโครงสร้างข้อมูลใหม่ให้สะอาดและเหมาะสำหรับ RAG (JSON Format)
-        scholar_data = {
-            "name": author.get("name", ""),
-            "affiliation": author.get("affiliation", ""),
-            "interests": author.get("interests", []),
-            "total_citations": author.get("citedby", 0),
-            "publications": []
-        }
-        
-        # วนลูปเก็บข้อมูลเปเปอร์แต่ละชิ้น
-        print("กำลังรวบรวมข้อมูลผลงานวิชาการ...")
-        for pub in author.get("publications", []):
-            pub_data = {
-                "title": pub.get("bib", {}).get("title", ""),
-                "year": pub.get("bib", {}).get("pub_year", "N/A"),
-                "citations": pub.get("num_citations", 0)
-            }
-            scholar_data["publications"].append(pub_data)
-            
-        # บันทึกข้อมูลลงไฟล์ JSON
-        output_filename = "scholar_data.json"
-        with open(output_filename, "w", encoding="utf-8") as f:
-            json.dump(scholar_data, f, ensure_ascii=False, indent=4)
-            
-        print(f"🎉 สำเร็จ! บันทึกข้อมูลลงไฟล์ {output_filename} เรียบร้อยแล้ว")
-        print(f"ดึงข้อมูลเปเปอร์มาได้ทั้งหมด {len(scholar_data['publications'])} รายการ")
-
-    except StopIteration:
-        print(f"❌ ข้อผิดพลาด: ไม่พบโปรไฟล์ที่ชื่อ '{author_name}' บน Google Scholar")
-        sys.exit(1)
+        search = GoogleSearch(params)
+        results = search.get_dict()
     except Exception as e:
-        print(f"❌ เกิดข้อผิดพลาดระหว่างดึงข้อมูล: {e}")
-        print("หาก Error เกี่ยวข้องกับ Connection หรือ Max Tries แสดงว่า Proxy ที่ได้มาถูก Google บล็อกไปแล้วครับ")
-        sys.exit(1)
+        print(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อ SerpApi: {e}")
+        return None
+
+    # ตรวจสอบว่ามีข้อมูลผู้แต่งหรือไม่
+    if "author" not in results:
+        print("⚠️ ไม่พบข้อมูลโปรไฟล์ กรุณาตรวจสอบ Author ID")
+        return None
+
+    author_info = results.get("author", {})
+    articles = results.get("articles", [])
+
+    print("✅ ดึงข้อมูลสำเร็จ! กำลังจัดรูปแบบสำหรับ RAG...")
+
+    # 1. จัดเตรียม Metadata
+    metadata = {
+        "scholar_id": author_id,
+        "name": author_info.get("name", ""),
+        "affiliation": author_info.get("affiliations", ""),
+        "interests": [interest.get("title", "") for interest in author_info.get("interests", [])],
+        "total_citations": results.get("cited_by", {}).get("table", [{}])[0].get("citations", {}).get("all", 0),
+        "h_index": results.get("cited_by", {}).get("table", [{}])[1].get("h_index", {}).get("all", 0),
+        "last_updated": datetime.now().isoformat()
+    }
+
+    # 2. จัดเตรียม Document Chunks
+    publications = []
+    for article in articles:
+        publications.append({
+            "title": article.get("title", ""),
+            "pub_year": article.get("year", "Unknown"),
+            "citations": article.get("cited_by", {}).get("value", 0),
+            "citation_url": article.get("link", "")
+        })
+
+    return {
+        "metadata": metadata,
+        "publications": publications
+    }
+
+def main():
+    rag_data = fetch_author_rag_data(AUTHOR_ID)
+    
+    if rag_data:
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(rag_data, f, ensure_ascii=False, indent=4)
+        print(f"💾 บันทึกข้อมูลลงไฟล์ {OUTPUT_FILE} เรียบร้อยแล้ว พร้อมนำไปใส่ Vector Database!")
+    else:
+        print("❌ ยกเลิกการอัปเดตไฟล์ JSON")
 
 if __name__ == "__main__":
     main()
