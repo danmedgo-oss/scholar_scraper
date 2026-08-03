@@ -5,7 +5,7 @@ from serpapi import GoogleSearch
 # 1. ใส่ ID ของผู้แต่งที่ต้องการดึงข้อมูลเพิ่มใน List นี้ได้เลย
 AUTHOR_IDS = [
     "8UGgxCIAAAAJ",
-    # "ID_คนที่_2",
+    "A3sPse4AAAAJ",
     # "ID_คนที่_3" 
 ]
 OUTPUT_FILE = "scholar_data.json"
