@@ -14,19 +14,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # อัปเดตจาก @v3 เป็น @v4 เพื่อแก้ Warning
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # อัปเดตจาก @v4 เป็น @v5 เพื่อแก้ Warning
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # แก้ไขจุดนี้: บังคับเวอร์ชัน httpx ให้อยู่ต่ำกว่า 0.28.0 เพื่อป้องกัน Dependency Conflict
+      # อัปเดต: ล็อกเวอร์ชันของ httpx และ free-proxy เพื่อป้องกัน Dependency Conflict
       - name: Install dependencies
-        run: pip install scholarly "httpx<0.28.0"
+        run: pip install scholarly "httpx<0.28.0" "free-proxy==1.1.1"
 
       - name: Run Scraper
         run: python scholar_scraper.py
