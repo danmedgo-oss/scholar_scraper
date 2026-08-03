@@ -7,27 +7,43 @@ from serpapi import GoogleSearch
 SHEET_URL = "https://docs.google.com/spreadsheets/d/12YLMeZbR_CEzCbmnLE7V0FuxffjhL2IUlteBCAXMEEM/export?format=csv"
 OUTPUT_FILE = "scholar_data.json"
 
-def get_scholar_ids_from_sheet(sheet_url):
-    author_ids = []
+def get_authors_from_sheet(sheet_url):
+    authors_info = []
     try:
         df = pd.read_csv(sheet_url)
-        for col in df.columns:
-            for val in df[col].dropna():
-                match = re.search(r"user=([a-zA-Z0-9_-]+)", str(val))
+        # ตรวจสอบชื่อคอลัมน์ใน Google Sheet (คาดหวังคอลัมน์ ชื่อ, Name, Link Google Scholar)
+        for _, row in df.iterrows():
+            link = ""
+            for col in df.columns:
+                val = str(row[col])
+                if "scholar.google.com" in val:
+                    link = val
+                    break
+            
+            if link:
+                match = re.search(r"user=([a-zA-Z0-9_-]+)", link)
                 if match:
                     author_id = match.group(1)
-                    if author_id not in author_ids:
-                        author_ids.append(author_id)
+                    # ดึงชื่อภาษาไทยและอังกฤษจากแถวเดียวกัน (ป้องกันค่า NaN)
+                    thai_name = str(row.get("ชื่อ", "")) if pd.notna(row.get("ชื่อ", "")) else ""
+                    eng_name = str(row.get("Name", "")) if pd.notna(row.get("Name", "")) else ""
+                    
+                    authors_info.append({
+                        "id": author_id,
+                        "thai_name": thai_name.strip(),
+                        "eng_name": eng_name.strip()
+                    })
     except Exception as e:
         print(f"Error reading google sheet: {e}")
-    return author_ids
+    return authors_info
 
-def fetch_author_rag_data(author_id):
+def fetch_author_rag_data(author_info):
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
         print("Error: SERPAPI_KEY not found")
         return None
 
+    author_id = author_info["id"]
     print(f"Fetching data for Scholar ID: {author_id}")
     params = {
         "engine": "google_scholar_author",
@@ -45,7 +61,7 @@ def fetch_author_rag_data(author_id):
     if "author" not in results:
         return None
 
-    author_info = results.get("author", {})
+    author_profile = results.get("author", {})
     articles = results.get("articles", [])
 
     cites = 0
@@ -58,9 +74,10 @@ def fetch_author_rag_data(author_id):
 
     metadata = {
         "id": author_id,
-        "nm": author_info.get("name", ""),
-        "aff": author_info.get("affiliations", ""),
-        "int": [i.get("title", "") for i in author_info.get("interests", [])],
+        "th_nm": author_info["thai_name"],
+        "en_nm": author_info["eng_name"] or author_profile.get("name", ""),
+        "aff": author_profile.get("affiliations", ""),
+        "int": [i.get("title", "") for i in author_profile.get("interests", [])],
         "cite": cites,
         "h": h_idx
     }
@@ -80,17 +97,17 @@ def fetch_author_rag_data(author_id):
     return {"m": metadata, "p": pubs}
 
 def main():
-    author_ids = get_scholar_ids_from_sheet(SHEET_URL)
-    print(f"Found author IDs from sheet: {author_ids}")
+    authors_list = get_authors_from_sheet(SHEET_URL)
+    print(f"Found authors from sheet: {len(authors_list)}")
 
     all_authors_data = []
-    for uid in author_ids:
-        data = fetch_author_rag_data(uid)
+    for author in authors_list:
+        data = fetch_author_rag_data(author)
         if data:
             all_authors_data.append(data)
-            print(f"Successfully fetched {uid}")
+            print(f"Successfully fetched {author['id']}")
         else:
-            print(f"Skipped ID: {uid}")
+            print(f"Skipped ID: {author['id']}")
 
     if all_authors_data:
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
