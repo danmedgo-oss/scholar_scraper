@@ -1,49 +1,69 @@
 import json
-import time
-import random
-from scholarly import scholarly
+import sys
+from scholarly import scholarly, ProxyGenerator
 
-# 1. กำหนด ID ของอาจารย์ที่ต้องการดึงข้อมูล
-# จาก URL: https://scholar.google.com/citations?hl=en&user=8UGgxCIAAAAJ
-AUTHOR_ID = "8UGgxCIAAAAJ"
-
-def fetch_and_save_data(author_id):
-    print(f"กำลังดึงข้อมูลของ ID: {author_id} ...")
+def main():
+    print("กำลังค้นหา Free Proxy... (ขั้นตอนนี้อาจใช้เวลา 2-5 นาที)")
     
+    # สร้างตัวจัดการ Proxy
+    pg = ProxyGenerator()
+    
+    # ค้นหาและตั้งค่า Free Proxy
+    # ข้อควรระวัง: บางครั้งอาจหา Proxy ฟรีที่ไม่โดนแบนไม่ได้เลย
+    success = pg.FreeProxies() 
+    
+    if success:
+        print("✅ ตั้งค่า Proxy สำเร็จ! ระบบกำลังเริ่มดึงข้อมูล...")
+        scholarly.use_proxy(pg)
+    else:
+        print("⚠️ ไม่พบ Free Proxy ที่ใช้งานได้ในขณะนี้ สคริปต์จะลองดึงข้อมูลโดยไม่ใช้ Proxy (มีความเสี่ยงที่จะโดนบล็อกสูง)")
+
     try:
-        # ใช้ search_author_id แทน search_author เพื่อความแม่นยำ 100%
-        author = scholarly.search_author_id(author_id)
+        author_name = 'Roongtiva Boonpracom'
+        print(f"กำลังค้นหาโปรไฟล์ของ: {author_name}...")
         
-        # ดึงข้อมูลทั้งหมดที่จำเป็น
-        author_data = scholarly.fill(author, sections=['basics', 'indices', 'publications'])
+        # ค้นหาชื่ออาจารย์
+        search_query = scholarly.search_author(author_name)
+        author = next(search_query)
         
-        # 2. จัดโครงสร้างข้อมูลใหม่ให้สะอาดขึ้น (เหมาะสำหรับ RAG)
-        extracted_data = {
-            "name": author_data.get("name"),
-            "affiliation": author_data.get("affiliation"),
-            "interests": author_data.get("interests", []),
-            "total_citations": author_data.get("citedby", 0),
-            "h_index": author_data.get("hindex", 0),
+        print("พบบัญชีผู้ใช้แล้ว! กำลังดึงรายละเอียดเชิงลึกและผลงานตีพิมพ์ทั้งหมด...")
+        # ดึงข้อมูลทั้งหมดของโปรไฟล์ (ขั้นตอนนี้อาจใช้เวลานานขึ้นอยู่กับจำนวนเปเปอร์)
+        author = scholarly.fill(author)
+        
+        # จัดโครงสร้างข้อมูลใหม่ให้สะอาดและเหมาะสำหรับ RAG (JSON Format)
+        scholar_data = {
+            "name": author.get("name", ""),
+            "affiliation": author.get("affiliation", ""),
+            "interests": author.get("interests", []),
+            "total_citations": author.get("citedby", 0),
             "publications": []
         }
         
-        # วนลูปดึงข้อมูลเปเปอร์ที่สำคัญ
-        for pub in author_data.get("publications", []):
-            pub_info = {
-                "title": pub.get("bib", {}).get("title"),
-                "year": pub.get("bib", {}).get("pub_year", "Unknown"),
+        # วนลูปเก็บข้อมูลเปเปอร์แต่ละชิ้น
+        print("กำลังรวบรวมข้อมูลผลงานวิชาการ...")
+        for pub in author.get("publications", []):
+            pub_data = {
+                "title": pub.get("bib", {}).get("title", ""),
+                "year": pub.get("bib", {}).get("pub_year", "N/A"),
                 "citations": pub.get("num_citations", 0)
             }
-            extracted_data["publications"].append(pub_info)
+            scholar_data["publications"].append(pub_data)
             
-        # 3. บันทึกข้อมูลลงไฟล์ JSON
-        with open("scholar_data.json", "w", encoding="utf-8") as f:
-            json.dump(extracted_data, f, ensure_ascii=False, indent=4)
+        # บันทึกข้อมูลลงไฟล์ JSON
+        output_filename = "scholar_data.json"
+        with open(output_filename, "w", encoding="utf-8") as f:
+            json.dump(scholar_data, f, ensure_ascii=False, indent=4)
             
-        print(f"✅ บันทึกข้อมูลของ {author_data['name']} สำเร็จ! (ได้ผลงาน {len(extracted_data['publications'])} ชิ้น)")
+        print(f"🎉 สำเร็จ! บันทึกข้อมูลลงไฟล์ {output_filename} เรียบร้อยแล้ว")
+        print(f"ดึงข้อมูลเปเปอร์มาได้ทั้งหมด {len(scholar_data['publications'])} รายการ")
 
+    except StopIteration:
+        print(f"❌ ข้อผิดพลาด: ไม่พบโปรไฟล์ที่ชื่อ '{author_name}' บน Google Scholar")
+        sys.exit(1)
     except Exception as e:
-        print(f"❌ เกิดข้อผิดพลาด: {e}")
+        print(f"❌ เกิดข้อผิดพลาดระหว่างดึงข้อมูล: {e}")
+        print("หาก Error เกี่ยวข้องกับ Connection หรือ Max Tries แสดงว่า Proxy ที่ได้มาถูก Google บล็อกไปแล้วครับ")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    fetch_and_save_data(AUTHOR_ID)
+    main()
