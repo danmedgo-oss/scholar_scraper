@@ -4,7 +4,6 @@ import re
 import pandas as pd
 from serpapi import GoogleSearch
 
-
 SHEET_URL = "https://docs.google.com/spreadsheets/d/12YLMeZbR_CEzCbmnLE7V0FuxffjhL2IUlteBCAXMEEM/export?format=csv"
 OUTPUT_FILE = "scholar_data.json"
 
@@ -12,7 +11,6 @@ def get_authors_from_sheet(sheet_url):
     authors_info = []
     try:
         df = pd.read_csv(sheet_url)
-        # ตรวจสอบชื่อคอลัมน์ใน Google Sheet (คาดหวังคอลัมน์ ชื่อ, Name, Link Google Scholar)
         for _, row in df.iterrows():
             link = ""
             for col in df.columns:
@@ -25,7 +23,6 @@ def get_authors_from_sheet(sheet_url):
                 match = re.search(r"user=([a-zA-Z0-9_-]+)", link)
                 if match:
                     author_id = match.group(1)
-                    # ดึงชื่อภาษาไทยและอังกฤษจากแถวเดียวกัน (ป้องกันค่า NaN)
                     thai_name = str(row.get("ชื่อ", "")) if pd.notna(row.get("ชื่อ", "")) else ""
                     eng_name = str(row.get("Name", "")) if pd.notna(row.get("Name", "")) else ""
                     
@@ -89,6 +86,7 @@ def fetch_author_rag_data(author_info):
         pub = {
             "t": article.get("title", ""),
             "y": article.get("year", ""),
+            "d": article.get("snippet", ""),  # เพิ่ม Description/Snippet ตรงนี้
             "c": article.get("cited_by", {}).get("value", 0),
             "u": article.get("link", "")
         }
