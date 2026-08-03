@@ -24,8 +24,9 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install scholarly
-        run: pip install scholarly
+      # แก้ไขจุดนี้: บังคับเวอร์ชัน httpx ให้อยู่ต่ำกว่า 0.28.0 เพื่อป้องกัน Dependency Conflict
+      - name: Install dependencies
+        run: pip install scholarly "httpx<0.28.0"
 
       - name: Run Scraper
         run: python scholar_scraper.py
