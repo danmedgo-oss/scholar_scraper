@@ -39,14 +39,26 @@ def fetch_author_rag_data(author_id):
 
     print("✅ ดึงข้อมูลสำเร็จ! กำลังจัดรูปแบบสำหรับ RAG...")
 
+    # --- ส่วนที่แก้ไข: ดึงข้อมูล Citations และ H-index แบบปลอดภัย ---
+    total_citations = 0
+    h_index = 0
+    cited_by_table = results.get("cited_by", {}).get("table", [])
+    
+    for row in cited_by_table:
+        if "citations" in row:
+            total_citations = row.get("citations", {}).get("all", 0)
+        elif "h_index" in row:
+            h_index = row.get("h_index", {}).get("all", 0)
+    # -------------------------------------------------------------
+
     # 1. จัดเตรียม Metadata
     metadata = {
         "scholar_id": author_id,
         "name": author_info.get("name", ""),
         "affiliation": author_info.get("affiliations", ""),
         "interests": [interest.get("title", "") for interest in author_info.get("interests", [])],
-        "total_citations": results.get("cited_by", {}).get("table", [{}])[0].get("citations", {}).get("all", 0),
-        "h_index": results.get("cited_by", {}).get("table", [{}])[1].get("h_index", {}).get("all", 0),
+        "total_citations": total_citations,
+        "h_index": h_index,
         "last_updated": datetime.now().isoformat()
     }
 
