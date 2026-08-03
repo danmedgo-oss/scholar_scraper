@@ -28,6 +28,9 @@ jobs:
         env:
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: python scholar_scraper.py
+
+        - name: Install dependencies
+        run: pip install google-search-results pandas
         
       - name: Commit and Push Data
         run: |
