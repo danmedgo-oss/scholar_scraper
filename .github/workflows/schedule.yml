@@ -2,21 +2,25 @@ name: Daily Scholar Scraper
 
 on:
   schedule:
-    # รันวันละ 1 ครั้ง เวลา 07:00 เช้า (เวลาไทย)
     - cron: '0 0 * * *'
-  # ปุ่มกดรันเองสำหรับตอนต้องการทดสอบ
   workflow_dispatch:
+
+# เพิ่มบล็อก permissions นี้เพื่อให้บอทมีสิทธิ์เขียนไฟล์ได้โดยตรงผ่านโค้ด
+permissions:
+  contents: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
+      # อัปเดตจาก @v3 เป็น @v4 เพื่อแก้ Warning
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # อัปเดตจาก @v4 เป็น @v5 เพื่อแก้ Warning
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
