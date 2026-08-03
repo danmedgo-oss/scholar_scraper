@@ -6,6 +6,7 @@ from serpapi import GoogleSearch
 AUTHOR_IDS = [
     "8UGgxCIAAAAJ",
     "A3sPse4AAAAJ",
+    "vcLWIZUAAAAJ" ,
     # "ID_คนที่_3" 
 ]
 OUTPUT_FILE = "scholar_data.json"
