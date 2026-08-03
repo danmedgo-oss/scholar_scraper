@@ -4,7 +4,6 @@ import re
 import pandas as pd
 from serpapi import GoogleSearch
 
-
 SHEET_URL = "https://docs.google.com/spreadsheets/d/12YLMeZbR_CEzCbmnLE7V0FuxffjhL2IUlteBCAXMEEM/export?format=csv"
 OUTPUT_FILE = "scholar_data.json"
 
