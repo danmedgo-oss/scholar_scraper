@@ -40,4 +40,5 @@ jobs:
           git config --local user.name "GitHub Action"
           git add *.json
           git commit -m "Auto-update RAG scholar and thaijo data" || echo "No changes to commit"
+          git pull --rebase origin main
           git push
