@@ -24,10 +24,13 @@ jobs:
       - name: Install dependencies
         run: pip install google-search-results pandas requests beautifulsoup4
 
-      - name: Run Scraper
+      - name: Run Scholar Scraper
         env:
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: python scholar_scraper.py
+        
+      - name: Run ThaiJO Scraper
+        run: python thaijo_scraper.py
         
       - name: Commit and Push Data
         run: |
