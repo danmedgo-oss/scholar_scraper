@@ -30,6 +30,8 @@ jobs:
         run: python scholar_scraper.py
         
       - name: Run ThaiJO Scraper
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: python thaijo_scraper.py
         
       - name: Commit and Push Data
