@@ -1,9 +1,7 @@
 import os
 import json
-import re
-import requests
 import pandas as pd
-from bs4 import BeautifulSoup
+from serpapi import GoogleSearch
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/12YLMeZbR_CEzCbmnLE7V0FuxffjhL2IUlteBCAXMEEM/export?format=csv"
 OUTPUT_FILE = "thaijo_data.json"
@@ -27,73 +25,76 @@ def get_thaijo_from_sheet(sheet_url):
                         thaijo_link = val
                         break
             
-            if thaijo_link:
+            if thaijo_link or thai_name:
                 authors_info.append({
                     "thai_name": thai_name.strip(),
-                    "eng_name": eng_name.strip(),
-                    "thaijo_link": thaijo_link
+                    "eng_name": eng_name.strip()
                 })
     except Exception as e:
         print(f"Error reading google sheet: {e}")
     return authors_info
 
-def fetch_thaijo_data(author_info):
-    thaijo_url = author_info.get("thaijo_link")
-    display_name = author_info['thai_name'] or author_info['eng_name'] or "Unknown"
+def fetch_thaijo_data_via_google(author_info):
+    api_key = os.getenv("SERPAPI_KEY")
+    display_name = author_info['thai_name'] or author_info['eng_name']
     
-    print(f"Fetching ThaiJO data for: {display_name}")
+    if not display_name:
+        return None
+        
+    print(f"Fetching ThaiJO via Google for: {display_name}")
     
+    if not api_key:
+        print("Error: SERPAPI_KEY not found in environment!")
+        return None
+        
     try:
-        res = requests.get(thaijo_url, timeout=15)
-        html_text = res.text.replace('\\u002F', '/').replace('\\/', '/')
+        params = {
+            "engine": "google",
+            "q": f'site:tci-thaijo.org "{display_name}"',
+            "api_key": api_key,
+            "num": 5
+        }
         
-        raw_links = re.findall(r'https://he\d+\.tci-thaijo\.org/index\.php/[a-zA-Z0-9_]+/article/view/\d+', html_text)
-        clean_links = list(set(raw_links))
+        search = GoogleSearch(params)
+        results = search.get_dict()
         
+        organic_results = results.get("organic_results", [])
+        if not organic_results:
+            return None
+            
         articles = []
-        for link in clean_links[:5]:
-            try:
-                page_res = requests.get(link, timeout=10)
-                page_soup = BeautifulSoup(page_res.text, 'html.parser')
+        for result in organic_results:
+            title = result.get("title", "").replace(" - ThaiJO", "").strip()
+            link = result.get("link", "")
+            
+            if "article/view" not in link:
+                continue
                 
-                title_tag = page_soup.find('h1', class_='page_title')
-                if not title_tag: continue
-                title = title_tag.text.strip()
-                
-                authors = []
-                for author_span in page_soup.find_all('span', class_='name'):
-                    authors.append(author_span.text.strip())
-                authors_str = ", ".join(authors) if authors else ""
-                
-                year = ""
-                date_div = page_soup.find('div', class_='item published')
-                if date_div:
-                    val_div = date_div.find('div', class_='value')
-                    if val_div:
-                        year_match = re.search(r'\b(20\d{2})\b', val_div.text)
-                        if year_match: year = year_match.group(1)
-                
-                pub = {"t": title, "y": year, "a": authors_str, "u": link}
-                pub = {k: v for k, v in pub.items() if v}
-                articles.append(pub)
-            except Exception as e:
-                print(f"Error fetching article {link}: {e}")
-                
+            pub = {
+                "t": title,
+                "a": display_name,
+                "u": link
+            }
+            articles.append(pub)
+            
         if articles:
-            return {"name": display_name, "publications": articles}
+            return {
+                "name": display_name,
+                "publications": articles
+            }
             
     except Exception as e:
-        print(f"Error scraping ThaiJO for {display_name}: {e}")
+        print(f"Error fetching ThaiJO via Google for {display_name}: {e}")
         
     return None
 
 def main():
     authors_list = get_thaijo_from_sheet(SHEET_URL)
-    print(f"Found ThaiJO authors from sheet: {len(authors_list)}")
+    print(f"Found authors from sheet: {len(authors_list)}")
 
     all_thaijo_data = []
     for author in authors_list:
-        data = fetch_thaijo_data(author)
+        data = fetch_thaijo_data_via_google(author)
         if data:
             all_thaijo_data.append(data)
             print(f"Successfully fetched {author['thai_name']}")
