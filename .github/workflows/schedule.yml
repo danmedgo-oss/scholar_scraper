@@ -22,7 +22,8 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install google-search-results pandas
+        # เพิ่ม requests และ beautifulsoup4 ตรงนี้ครับ
+        run: pip install google-search-results pandas requests beautifulsoup4
 
       - name: Run Scraper
         env:
@@ -33,6 +34,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add scholar_data.json
-          git commit -m "Auto-update RAG scholar data" || echo "No changes to commit"
+          # สั่งให้บอท Add ไฟล์ thaijo_data.json เข้าไปด้วย
+          git add scholar_data.json thaijo_data.json
+          git commit -m "Auto-update RAG scholar and thaijo data" || echo "No changes to commit"
           git push
